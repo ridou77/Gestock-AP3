@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+    
+    // Helper function pour vérifier si l'utilisateur est actif
+    function isActiveUser(uid) {
+      return userDoc(uid) != null && userDoc(uid).active != false;
+    }
+    
+    // Helper function pour vérifier si l'utilisateur est admin
+    function isAdmin() {
+      return request.auth != null && 
+        isActiveUser(request.auth.uid) &&
+        userDoc(request.auth.uid).role == "admin";
+    }
+    
+    // Helper function pour vérifier si l'utilisateur est gestionnaire ou admin
+    function isGestionnaireOrAdmin() {
+      return request.auth != null && 
+        isActiveUser(request.auth.uid) &&
+        userDoc(request.auth.uid).role in ["admin", "gestionnaire"];
+    }
+    
+    function isSelfProfileUpdate(userId) {
+      return request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.active == resource.data.active &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.firstName is string &&
+        request.resource.data.lastName is string &&
+        (request.resource.data.age is int || request.resource.data.age == null);
+    }
+    
+    // Collection des utilisateurs et leurs rôles
+    match /users/{userId} {
+      // Lecture : l'utilisateur peut lire son propre document OU un admin peut tout lire
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+      
+      // Création : auto lors de l'inscription (l'utilisateur créé son propre document)
+      allow create: if request.auth != null && 
+        request.auth.uid == userId &&
+        request.resource.data.uid == userId &&
+        request.resource.data.email is string &&
+        request.resource.data.role in ["admin", "gestionnaire", "visiteur"] &&
+        request.resource.data.firstName is string &&
+        request.resource.data.lastName is string &&
+        (request.resource.data.age is int || request.resource.data.age == null) &&
+        request.resource.data.active == true;
+      
+      // Modification : admins OU utilisateur sur son profil
+      allow update: if isAdmin() || isSelfProfileUpdate(userId);
+      
+      // Suppression : seulement les admins
+      allow delete: if isAdmin();
+    }
+    
+    // Exemple pour d'autres collections (à adapter selon tes besoins)
+    // Collection "produits" ou "stock"
+    match /stock/{itemId} {
+      // Lecture : utilisateurs actifs authentifiés
+      allow read: if request.auth != null && isActiveUser(request.auth.uid);
+      
+      // Création : gestionnaires et admins uniquement
+      allow create: if isGestionnaireOrAdmin();
+      
+      // Modification : gestionnaires et admins uniquement
+      allow update: if isGestionnaireOrAdmin();
+      
+      // Suppression : gestionnaires et admins uniquement
+      allow delete: if isGestionnaireOrAdmin();
+    }
+    
+    // Par défaut, bloquer tout accès
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
