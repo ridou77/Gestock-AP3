@@ -1,33 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
     function userDoc(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
-    
-    // Helper function pour vérifier si l'utilisateur est actif
-    function isActiveUser(uid) {
-      return userDoc(uid) != null && userDoc(uid).active != false;
+
+    function isSignedIn() {
+      return request.auth != null;
     }
-    
-    // Helper function pour vérifier si l'utilisateur est admin
+
+    function isActiveUser() {
+      return isSignedIn() &&
+        userDoc(request.auth.uid) != null &&
+        userDoc(request.auth.uid).active != false;
+    }
+
+    function hasRole(role) {
+      return isActiveUser() && userDoc(request.auth.uid).role == role;
+    }
+
     function isAdmin() {
-      return request.auth != null && 
-        isActiveUser(request.auth.uid) &&
-        userDoc(request.auth.uid).role == "admin";
+      return hasRole("admin");
     }
-    
-    // Helper function pour vérifier si l'utilisateur est gestionnaire ou admin
-    function isGestionnaireOrAdmin() {
-      return request.auth != null && 
-        isActiveUser(request.auth.uid) &&
-        userDoc(request.auth.uid).role in ["admin", "gestionnaire"];
+
+    function isGestionnaire() {
+      return hasRole("gestionnaire");
     }
-    
+
+    function isVisiteur() {
+      return hasRole("visiteur");
+    }
+
+    function isAdminOrGestionnaire() {
+      return isAdmin() || isGestionnaire();
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     function isSelfProfileUpdate(userId) {
-      return request.auth != null &&
-        request.auth.uid == userId &&
+      return isSelf(userId) &&
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.email == resource.data.email &&
         request.resource.data.role == resource.data.role &&
@@ -35,50 +48,99 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt &&
         request.resource.data.firstName is string &&
         request.resource.data.lastName is string &&
-        (request.resource.data.age is int || request.resource.data.age == null);
+        (request.resource.data.age is int || request.resource.data.age == null) &&
+        request.resource.data.updatedAt is timestamp;
     }
-    
-    // Collection des utilisateurs et leurs rôles
-    match /users/{userId} {
-      // Lecture : l'utilisateur peut lire son propre document OU un admin peut tout lire
-      allow read: if request.auth != null && 
-        (request.auth.uid == userId || isAdmin());
-      
-      // Création : auto lors de l'inscription (l'utilisateur créé son propre document)
-      allow create: if request.auth != null && 
-        request.auth.uid == userId &&
-        request.resource.data.uid == userId &&
-        request.resource.data.email is string &&
+
+    function isAdminUserUpdate() {
+      return request.resource.data.uid == resource.data.uid &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.createdAt == resource.data.createdAt &&
         request.resource.data.role in ["admin", "gestionnaire", "visiteur"] &&
+        request.resource.data.active is bool &&
         request.resource.data.firstName is string &&
         request.resource.data.lastName is string &&
         (request.resource.data.age is int || request.resource.data.age == null) &&
-        request.resource.data.active == true;
-      
-      // Modification : admins OU utilisateur sur son profil
-      allow update: if isAdmin() || isSelfProfileUpdate(userId);
-      
-      // Suppression : seulement les admins
+        request.resource.data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      allow create: if isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.uid == userId &&
+        request.resource.data.email is string &&
+        request.resource.data.role == "visiteur" &&
+        request.resource.data.firstName is string &&
+        request.resource.data.lastName is string &&
+        (request.resource.data.age is int || request.resource.data.age == null) &&
+        request.resource.data.active == true &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp;
+
+      allow update: if (isAdmin() && isAdminUserUpdate()) || isSelfProfileUpdate(userId);
+
       allow delete: if isAdmin();
     }
-    
-    // Exemple pour d'autres collections (à adapter selon tes besoins)
-    // Collection "produits" ou "stock"
-    match /stock/{itemId} {
-      // Lecture : utilisateurs actifs authentifiés
-      allow read: if request.auth != null && isActiveUser(request.auth.uid);
-      
-      // Création : gestionnaires et admins uniquement
-      allow create: if isGestionnaireOrAdmin();
-      
-      // Modification : gestionnaires et admins uniquement
-      allow update: if isGestionnaireOrAdmin();
-      
-      // Suppression : gestionnaires et admins uniquement
-      allow delete: if isGestionnaireOrAdmin();
+
+    match /typeStock/{typeId} {
+      allow read: if isActiveUser();
+      allow create, update, delete: if isAdminOrGestionnaire();
     }
-    
-    // Par défaut, bloquer tout accès
+
+    match /produits/{productId} {
+      allow read: if isActiveUser();
+      allow create, update, delete: if isAdminOrGestionnaire();
+    }
+
+    match /commandes/{orderId} {
+      allow read: if isActiveUser() &&
+        (isAdminOrGestionnaire() || request.auth.uid == resource.data.utilisateur);
+
+      allow create: if isAdminOrGestionnaire() &&
+        request.auth.uid == request.resource.data.utilisateur &&
+        request.resource.data.utilisateurEmail is string &&
+        request.resource.data.statut == "En attente" &&
+        request.resource.data.details is list &&
+        request.resource.data.stockProcessed == false;
+
+      allow update: if isAdminOrGestionnaire() || (
+        isActiveUser() &&
+        request.auth.uid == resource.data.utilisateur &&
+        !isVisiteur() &&
+        (
+          (
+            resource.data.statut == "En attente" &&
+            request.resource.data.statut == "En attente" &&
+            request.resource.data.details is list &&
+            request.resource.data.utilisateur == resource.data.utilisateur &&
+            request.resource.data.utilisateurEmail == resource.data.utilisateurEmail &&
+            request.resource.data.dateCommande == resource.data.dateCommande &&
+            request.resource.data.stockProcessed == resource.data.stockProcessed
+          ) ||
+          (
+            request.resource.data.statut == "Annulée" &&
+            resource.data.statut in ["En attente", "En préparation", "Expédiée"] &&
+            request.resource.data.details == resource.data.details &&
+            request.resource.data.utilisateur == resource.data.utilisateur &&
+            request.resource.data.utilisateurEmail == resource.data.utilisateurEmail &&
+            request.resource.data.dateCommande == resource.data.dateCommande &&
+            request.resource.data.stockProcessed == resource.data.stockProcessed
+          )
+        )
+      );
+
+      allow delete: if isAdminOrGestionnaire() ||
+        (isActiveUser() && request.auth.uid == resource.data.utilisateur && !isVisiteur() && resource.data.statut == "En attente");
+    }
+
+    match /mouvements/{movementId} {
+      allow read: if isAdminOrGestionnaire();
+      allow create: if isAdminOrGestionnaire();
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -3,7 +3,9 @@ import { auth } from "./firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  sendPasswordResetEmail,
+  updatePassword,
 } from "firebase/auth";
 import { initializeNewUser } from "./roleService";
 import type { UserData, UserRole } from "../types/roles";
@@ -26,4 +28,15 @@ export function login(email: string , password: string ) {
 
 export function logout() {
   return signOut(auth);
+}
+
+export function resetPassword(email: string) {
+  return sendPasswordResetEmail(auth, email);
+}
+
+export function changePassword(newPassword: string) {
+  if (!auth.currentUser) {
+    throw new Error("Aucun utilisateur connecté.");
+  }
+  return updatePassword(auth.currentUser, newPassword);
 }

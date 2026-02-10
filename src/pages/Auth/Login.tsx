@@ -1,16 +1,18 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import { login, register } from "../services/authService";
-import { ROLE_LABELS } from "../types/roles";
-import type { UserRole } from "../types/roles";
-import "../auth.css";
+import { Link, useNavigate } from "react-router-dom";
+import { login, register } from "../../services/authService";
+import { getPasswordError, PASSWORD_HINT } from "../../utils/password";
+import "../../auth.css";
 
-export default function Login() {
+type Props = {
+  defaultMode?: "login" | "register";
+};
+
+export default function Login({ defaultMode = "login" }: Props) {
   const navigate = useNavigate();
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] = useState(defaultMode === "register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("visiteur");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [age, setAge] = useState("");
@@ -23,8 +25,14 @@ export default function Login() {
     setLoading(true);
     try {
       if (isRegister) {
+        const passwordError = getPasswordError(password);
+        if (passwordError) {
+          setError(passwordError);
+          setLoading(false);
+          return;
+        }
         const parsedAge = age.trim() === "" ? null : Number(age);
-        await register(email, password, role, {
+        await register(email, password, "visiteur", {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           age: Number.isFinite(parsedAge) ? parsedAge : null,
@@ -47,7 +55,7 @@ export default function Login() {
           <p className="auth-kicker">Gestion de stock</p>
           <h1>GESTOCK</h1>
           <p className="auth-subtitle">
-            {isRegister ? "Créez un compte et définissez un rôle." : "Accédez au tableau de bord sécurisé."}
+            {isRegister ? "Créez un compte pour accéder à l'application." : "Accédez au tableau de bord sécurisé."}
           </p>
         </div>
 
@@ -90,29 +98,15 @@ export default function Login() {
             <input
               className="auth-input"
               type="password"
-              placeholder="Minimum 6 caractères"
+              placeholder="Minimum 8 caractères"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
-              minLength={6}
+              minLength={8}
             />
           </label>
-          {isRegister && (
-            <label className="auth-field">
-              <span>Rôle</span>
-              <select
-                className="auth-input"
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                disabled={loading}
-              >
-                <option value="visiteur">{ROLE_LABELS.visiteur}</option>
-                <option value="gestionnaire">{ROLE_LABELS.gestionnaire}</option>
-                <option value="admin">{ROLE_LABELS.admin}</option>
-              </select>
-            </label>
-          )}
+          {isRegister && <p className="helper-text">{PASSWORD_HINT}</p>}
           {isRegister && (
             <label className="auth-field">
               <span>Prénom</span>
@@ -160,6 +154,12 @@ export default function Login() {
             {loading ? "Chargement..." : isRegister ? "S'inscrire" : "Se connecter"}
           </button>
         </form>
+
+        {!isRegister && (
+          <div style={{ marginTop: "12px", fontSize: "13px" }}>
+            <Link to="/reset">Mot de passe oublié ?</Link>
+          </div>
+        )}
 
         {error && <div className="auth-message auth-error">{error}</div>}
       </div>

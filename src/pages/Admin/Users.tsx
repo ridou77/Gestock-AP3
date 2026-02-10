@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { listenAllUsers, updateUser } from "../services/roleService";
-import { useRole } from "../hooks/useRole";
-import { useAuth } from "../hooks/useAuth";
-import type { UserData, UserRole } from "../types/roles";
+import { listenAllUsers, updateUser } from "../../services/roleService";
+import { useRole } from "../../hooks/useRole";
+import { useAuth } from "../../hooks/useAuth";
+import type { UserData, UserRole } from "../../types/roles";
 
 type UserDraft = {
     firstName: string;
