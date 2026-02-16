@@ -1,13 +1,31 @@
 import { render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
 import Dashboard from "./index";
+import type { Product } from "../../types/products";
+import type { Order } from "../../types/orders";
 
-const products = [
-  { id: "p1", nom: "Clavier", quantite_dispo: 2, seuil_alerte: 3 },
-  { id: "p2", nom: "Souris", quantite_dispo: 10, seuil_alerte: 3 },
+const products: Product[] = [
+  {
+    id: "p1",
+    nom: "Clavier",
+    description: "Clavier mecanique",
+    typeStockId: "t1",
+    createdBy: "u1",
+    quantite_dispo: 2,
+    seuil_alerte: 3,
+  },
+  {
+    id: "p2",
+    nom: "Souris",
+    description: "Souris optique",
+    typeStockId: "t1",
+    createdBy: "u1",
+    quantite_dispo: 10,
+    seuil_alerte: 3,
+  },
 ];
 
-const orders = [
+const orders: Order[] = [
   {
     id: "o1",
     utilisateur: "u1",
@@ -29,14 +47,14 @@ vi.mock("../../hooks/useRole", () => ({
 }));
 
 vi.mock("../../services/productService", () => ({
-  listenProducts: (onData: (data: any[]) => void) => {
+  listenProducts: (onData: (data: Product[]) => void) => {
     onData(products);
     return () => {};
   },
 }));
 
 vi.mock("../../services/orderService", () => ({
-  listenUserOrders: (_userId: string, onData: (data: any[]) => void) => {
+  listenUserOrders: (_userId: string, onData: (data: Order[]) => void) => {
     onData(orders);
     return () => {};
   },

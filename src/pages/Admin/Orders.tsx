@@ -14,6 +14,8 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const getErrorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback;
 
   const formatDate = (value?: { toDate?: () => Date }) => {
     if (!value || typeof value.toDate !== "function") return "—";
@@ -32,8 +34,8 @@ export default function AdminOrders() {
     setError(null);
     try {
       await adminUpdateOrderStatus(orderId, status, { isAdmin: true });
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la mise à jour.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de la mise à jour."));
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -44,8 +46,8 @@ export default function AdminOrders() {
     setError(null);
     try {
       await deleteOrder(orderId, { isAdmin: true });
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la suppression.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de la suppression."));
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }

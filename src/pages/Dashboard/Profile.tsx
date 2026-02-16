@@ -29,6 +29,8 @@ export default function Profile() {
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const getErrorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback;
 
   useEffect(() => {
     if (!user) {
@@ -109,8 +111,8 @@ export default function Profile() {
       setPasswordSuccess("Mot de passe mis à jour.");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      setPasswordError(err.message || "Impossible de modifier le mot de passe.");
+    } catch (err) {
+      setPasswordError(getErrorMessage(err, "Impossible de modifier le mot de passe."));
     } finally {
       setPasswordSaving(false);
     }

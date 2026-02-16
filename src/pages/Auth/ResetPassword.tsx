@@ -7,6 +7,8 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const getErrorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -16,8 +18,8 @@ export default function ResetPassword() {
     try {
       await resetPassword(email);
       setMessage("Email de réinitialisation envoyé.");
-    } catch (err: any) {
-      setError(err.message || "Impossible d'envoyer l'email.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Impossible d'envoyer l'email."));
     } finally {
       setLoading(false);
     }

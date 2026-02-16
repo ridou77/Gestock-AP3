@@ -12,9 +12,8 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState("Profil");
 
-  if (!user) return null;
-
   useEffect(() => {
+    if (!user) return;
     const unsubscribe = listenUserData(
       user.uid,
       (data) => {
@@ -34,12 +33,14 @@ export default function Navbar() {
     );
 
     return () => unsubscribe();
-  }, [user.uid, user.email]);
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
+
+  if (!user) return null;
 
   return (
     <nav className="navbar">

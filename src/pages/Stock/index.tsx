@@ -14,6 +14,8 @@ export default function Stock() {
   const [quantity, setQuantity] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const getErrorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback;
 
   useEffect(() => {
     const unsubscribe = listenProducts(setProducts);
@@ -39,8 +41,8 @@ export default function Stock() {
       setMessage("Stock ajouté.");
       setQuantity("");
       setProductId("");
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'ajout.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de l'ajout."));
     }
   };
 

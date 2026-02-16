@@ -23,8 +23,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    setProductsLoaded(false);
-    setOrdersLoaded(false);
     const unsubscribeProducts = listenProducts(
       (data) => {
         setProducts(data);

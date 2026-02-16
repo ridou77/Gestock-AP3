@@ -31,6 +31,8 @@ export default function OrderTrack() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const isStaff = isAdmin;
   const canEdit = !!permissions?.canUpdate;
+  const getErrorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback;
 
   useEffect(() => {
     if (!user) return;
@@ -75,11 +77,12 @@ export default function OrderTrack() {
     try {
       await updateOrderDetails(orderId, draft, { userId: user?.uid, isAdmin });
       setDrafts((prev) => {
-        const { [orderId]: _, ...rest } = prev;
-        return rest;
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
       });
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la mise à jour.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de la mise à jour."));
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -89,8 +92,8 @@ export default function OrderTrack() {
     setSaving((prev) => ({ ...prev, [orderId]: true }));
     try {
       await cancelOrder(orderId, { userId: user?.uid, isAdmin });
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'annulation.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de l'annulation."));
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -101,8 +104,8 @@ export default function OrderTrack() {
     setError(null);
     try {
       await deleteOrder(orderId, { userId: user?.uid, isAdmin });
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la suppression.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de la suppression."));
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -113,8 +116,8 @@ export default function OrderTrack() {
     setError(null);
     try {
       await adminUpdateOrderStatus(orderId, status, { userId: user?.uid, isAdmin });
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la mise à jour.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de la mise à jour."));
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }

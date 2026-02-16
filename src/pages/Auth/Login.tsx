@@ -18,6 +18,8 @@ export default function Login({ defaultMode = "login" }: Props) {
   const [age, setAge] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const getErrorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,8 +43,8 @@ export default function Login({ defaultMode = "login" }: Props) {
         await login(email, password);
       }
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Erreur");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur"));
     } finally {
       setLoading(false);
     }

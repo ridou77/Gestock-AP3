@@ -9,6 +9,9 @@ import {
   listenUserOrders,
   updateOrderDetails,
 } from "../../services/orderService";
+import type { AuthContextType } from "../../contexts/authContext";
+import type { Order } from "../../types/orders";
+import type { User } from "firebase/auth";
 
 vi.mock("../../hooks/useAuth", () => ({ useAuth: vi.fn() }));
 vi.mock("../../hooks/useRole", () => ({ useRole: vi.fn() }));
@@ -27,15 +30,18 @@ const mockedListenUserOrders = vi.mocked(listenUserOrders);
 
 describe("OrderTrack", () => {
   beforeEach(() => {
-    mockedUseAuth.mockReturnValue({
-      user: { uid: "u1", email: "user@test.local" },
-    } as any);
+    const authValue: AuthContextType = {
+      user: { uid: "u1", email: "user@test.local" } as User,
+      profile: null,
+      loading: false,
+    };
+    mockedUseAuth.mockReturnValue(authValue);
     mockedUseRole.mockReturnValue({
       isAdmin: false,
       isGestionnaire: true,
       permissions: { canUpdate: true },
-    } as any);
-    mockedListenUserOrders.mockImplementation((_userId, onData) => {
+    } as ReturnType<typeof useRole>);
+    mockedListenUserOrders.mockImplementation((_userId, onData: (data: Order[]) => void) => {
       onData([
         {
           id: "o1",

@@ -7,6 +7,9 @@ import { useAuth } from "../../hooks/useAuth";
 import { useRole } from "../../hooks/useRole";
 import { listenProducts } from "../../services/productService";
 import { createOrder } from "../../services/orderService";
+import type { AuthContextType } from "../../contexts/authContext";
+import type { Product } from "../../types/products";
+import type { User } from "firebase/auth";
 
 vi.mock("../../hooks/useAuth", () => ({ useAuth: vi.fn() }));
 vi.mock("../../hooks/useRole", () => ({ useRole: vi.fn() }));
@@ -19,10 +22,13 @@ const mockedListenProducts = vi.mocked(listenProducts);
 
 describe("OrderCreate", () => {
   beforeEach(() => {
-    mockedUseAuth.mockReturnValue({
-      user: { uid: "u1", email: "user@test.local" },
-    } as any);
-    mockedListenProducts.mockImplementation((onData) => {
+    const authValue: AuthContextType = {
+      user: { uid: "u1", email: "user@test.local" } as User,
+      profile: null,
+      loading: false,
+    };
+    mockedUseAuth.mockReturnValue(authValue);
+    mockedListenProducts.mockImplementation((onData: (data: Product[]) => void) => {
       onData([
         {
           id: "p1",
@@ -45,7 +51,7 @@ describe("OrderCreate", () => {
   it("affiche le message lecture seule pour le visiteur", () => {
     mockedUseRole.mockReturnValue({
       permissions: { canCreate: false },
-    } as any);
+    } as ReturnType<typeof useRole>);
 
     render(
       <MemoryRouter>
@@ -61,7 +67,7 @@ describe("OrderCreate", () => {
   it("affiche une erreur si le panier est vide", async () => {
     mockedUseRole.mockReturnValue({
       permissions: { canCreate: true },
-    } as any);
+    } as ReturnType<typeof useRole>);
     const user = userEvent.setup();
 
     render(

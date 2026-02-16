@@ -56,8 +56,9 @@ export default function AdminProducts() {
     if (!draft) return;
     await updateStockType(type.id, draft.trim());
     setTypeDrafts((prev) => {
-      const { [type.id]: _, ...rest } = prev;
-      return rest;
+      const next = { ...prev };
+      delete next[type.id];
+      return next;
     });
   };
 
@@ -118,8 +119,9 @@ export default function AdminProducts() {
         seuil_alerte: Number(draft.seuil_alerte) || 0,
       });
       setProductDrafts((prev) => {
-        const { [product.id]: _, ...rest } = prev;
-        return rest;
+        const next = { ...prev };
+        delete next[product.id];
+        return next;
       });
     } catch (err) {
       console.error("Erreur:", err);

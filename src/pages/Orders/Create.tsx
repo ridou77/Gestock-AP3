@@ -21,6 +21,8 @@ export default function OrderCreate() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const getErrorMessage = (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback;
 
   useEffect(() => {
     const unsubscribe = listenProducts(setProducts);
@@ -87,8 +89,8 @@ export default function OrderCreate() {
       setCart([]);
       setQuantities({});
       setSuccess("Commande créée.");
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la création.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Erreur lors de la création."));
     } finally {
       setSaving(false);
     }

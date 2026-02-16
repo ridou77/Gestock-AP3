@@ -9,10 +9,15 @@ import * as firestore from "firebase/firestore";
 vi.mock("./firebase", () => ({ db: {} }));
 
 vi.mock("firebase/firestore", () => {
-  const store = new Map<string, any>();
-  const updates: Array<{ ref: any; data: any }> = [];
-  const sets: Array<{ ref: any; data: any }> = [];
-  const deletes: Array<any> = [];
+  type DocRef = { path: string; id: string; __type?: "collection" };
+  type StoredDoc = Record<string, unknown>;
+  type UpdateEntry = { ref: DocRef; data: StoredDoc };
+  type SetEntry = { ref: DocRef; data: StoredDoc };
+
+  const store = new Map<string, StoredDoc>();
+  const updates: UpdateEntry[] = [];
+  const sets: SetEntry[] = [];
+  const deletes: DocRef[] = [];
   let autoId = 0;
 
   const __reset = () => {
@@ -23,7 +28,7 @@ vi.mock("firebase/firestore", () => {
     autoId = 0;
   };
 
-  const __setDoc = (path: string, data: any) => {
+  const __setDoc = (path: string, data: StoredDoc) => {
     store.set(path, data);
   };
 
@@ -31,15 +36,21 @@ vi.mock("firebase/firestore", () => {
   const __getSets = () => sets.slice();
   const __getDeletes = () => deletes.slice();
 
-  const collection = (_db: any, path: string) => ({ __type: "collection", path });
+  const collection = (_db: unknown, path: string): DocRef => ({
+    __type: "collection",
+    path,
+    id: path,
+  });
 
-  const doc = (arg1: any, arg2?: string, arg3?: string) => {
-    if (arg1 && arg1.__type === "collection" && !arg2) {
+  const doc = (arg1: unknown, arg2?: string, arg3?: string): DocRef => {
+    if (typeof arg1 === "object" && arg1 !== null && (arg1 as DocRef).__type === "collection" && !arg2) {
+      const col = arg1 as DocRef;
       const id = `auto_${++autoId}`;
-      return { path: `${arg1.path}/${id}`, id };
+      return { path: `${col.path}/${id}`, id };
     }
-    if (arg1 && arg1.__type === "collection" && typeof arg2 === "string") {
-      return { path: `${arg1.path}/${arg2}`, id: arg2 };
+    if (typeof arg1 === "object" && arg1 !== null && (arg1 as DocRef).__type === "collection" && typeof arg2 === "string") {
+      const col = arg1 as DocRef;
+      return { path: `${col.path}/${arg2}`, id: arg2 };
     }
     if (typeof arg1 === "object" && typeof arg2 === "string" && typeof arg3 === "string") {
       return { path: `${arg2}/${arg3}`, id: arg3 };
@@ -47,25 +58,30 @@ vi.mock("firebase/firestore", () => {
     return { path: "unknown", id: "unknown" };
   };
 
-  const runTransaction = async (_db: any, fn: (tx: any) => Promise<any>) => {
+  const runTransaction = async (_db: unknown, fn: (tx: {
+    get: (ref: DocRef) => Promise<{ exists: () => boolean; data: () => StoredDoc | undefined }>;
+    update: (ref: DocRef, data: StoredDoc) => void;
+    set: (ref: DocRef, data: StoredDoc) => void;
+    delete: (ref: DocRef) => void;
+  }) => Promise<unknown>) => {
     const tx = {
-      get: async (ref: any) => {
+      get: async (ref: DocRef) => {
         const data = store.get(ref.path);
         return {
           exists: () => data !== undefined,
           data: () => data,
         };
       },
-      update: vi.fn((ref: any, data: any) => {
+      update: vi.fn((ref: DocRef, data: StoredDoc) => {
         updates.push({ ref, data });
         const prev = store.get(ref.path) ?? {};
         store.set(ref.path, { ...prev, ...data });
       }),
-      set: vi.fn((ref: any, data: any) => {
+      set: vi.fn((ref: DocRef, data: StoredDoc) => {
         sets.push({ ref, data });
         store.set(ref.path, data);
       }),
-      delete: vi.fn((ref: any) => {
+      delete: vi.fn((ref: DocRef) => {
         deletes.push(ref);
         store.delete(ref.path);
       }),
@@ -97,7 +113,14 @@ vi.mock("firebase/firestore", () => {
   };
 });
 
-const fsMock = firestore as any;
+type FirestoreTestHelpers = {
+  __reset: () => void;
+  __setDoc: (path: string, data: Record<string, unknown>) => void;
+  __getUpdates: () => Array<{ ref: { path: string }; data: Record<string, unknown> }>;
+  __getSets: () => Array<{ ref: { path: string }; data: Record<string, unknown> }>;
+};
+
+const fsMock = firestore as unknown as FirestoreTestHelpers;
 
 describe("orderService", () => {
   beforeEach(() => {
@@ -145,11 +168,11 @@ describe("orderService", () => {
     await cancelOrder("o1", { userId: "u1", isAdmin: false });
 
     const updates = fsMock.__getUpdates();
-    const productUpdate = updates.find((u: any) => u.ref.path === "produits/p1");
+    const productUpdate = updates.find((u) => u.ref.path === "produits/p1");
     expect(productUpdate).toBeTruthy();
-    expect(productUpdate.data.quantite_dispo).toBe(7);
+    expect(productUpdate?.data.quantite_dispo).toBe(7);
 
     const sets = fsMock.__getSets();
-    expect(sets.some((s: any) => s.ref.path.startsWith("mouvements/"))).toBe(true);
+    expect(sets.some((s) => s.ref.path.startsWith("mouvements/"))).toBe(true);
   });
 });

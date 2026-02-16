@@ -77,8 +77,9 @@ export default function UserManagement() {
                 role: user.uid === currentUser?.uid ? user.role : draft.role,
             });
             setDrafts((prev) => {
-                const { [user.uid]: _, ...rest } = prev;
-                return rest;
+                const next = { ...prev };
+                delete next[user.uid];
+                return next;
             });
         } catch (err) {
             console.error("Erreur:", err);
