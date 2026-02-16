@@ -90,7 +90,11 @@ export async function createOrder(
   });
 }
 
-export async function updateOrderDetails(orderId: string, details: OrderDetail[]) {
+export async function updateOrderDetails(
+  orderId: string,
+  details: OrderDetail[],
+  actor?: { userId?: string; isAdmin?: boolean }
+) {
   const orderRef = doc(db, ORDERS_COLLECTION, orderId);
   if (details.length === 0) {
     throw new Error("La commande est vide.");
@@ -101,6 +105,9 @@ export async function updateOrderDetails(orderId: string, details: OrderDetail[]
       throw new Error("Commande introuvable.");
     }
     const order = orderSnap.data() as Order;
+    if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
+      throw new Error("Commande non autorisée.");
+    }
     if (order.statut !== "En attente") {
       throw new Error("Commande non modifiable.");
     }
@@ -123,7 +130,10 @@ export async function updateOrderDetails(orderId: string, details: OrderDetail[]
   });
 }
 
-export async function cancelOrder(orderId: string) {
+export async function cancelOrder(
+  orderId: string,
+  actor?: { userId?: string; isAdmin?: boolean }
+) {
   const orderRef = doc(db, ORDERS_COLLECTION, orderId);
   await runTransaction(db, async (transaction) => {
     const orderSnap = await transaction.get(orderRef);
@@ -131,17 +141,84 @@ export async function cancelOrder(orderId: string) {
       throw new Error("Commande introuvable.");
     }
     const order = orderSnap.data() as Order;
+    if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
+      throw new Error("Commande non autorisée.");
+    }
+    if (order.statut === "Annulée") {
+      throw new Error("Commande déjà annulée.");
+    }
     if (order.statut === "Terminée") {
       throw new Error("Commande terminée non annulable.");
     }
+    if (order.stockProcessed) {
+      const stockUpdates: Array<{ productRef: ReturnType<typeof doc>; stock: number; item: OrderDetail }> = [];
+      for (const item of order.details) {
+        const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
+        const productSnap = await transaction.get(productRef);
+        if (!productSnap.exists()) {
+          throw new Error("Produit introuvable.");
+        }
+        const data = productSnap.data();
+        const stock = Number(data.quantite_dispo ?? 0);
+        stockUpdates.push({ productRef, stock, item });
+      }
+
+      for (const { productRef, stock, item } of stockUpdates) {
+        transaction.update(productRef, {
+          quantite_dispo: stock + item.quantite,
+          updatedAt: serverTimestamp(),
+        });
+
+        const movementRef = doc(collection(db, MOVEMENTS_COLLECTION));
+        transaction.set(movementRef, {
+          type_mouvement: "Entrée",
+          produitId: item.productId,
+          produitNom: item.nom,
+          quantite: item.quantite,
+          utilisateur: order.utilisateur,
+          date: serverTimestamp(),
+          orderId,
+        });
+      }
+    }
+
     transaction.update(orderRef, {
       statut: "Annulée",
       updatedAt: serverTimestamp(),
+      stockProcessed: order.stockProcessed ? false : order.stockProcessed,
     });
   });
 }
 
-export async function adminUpdateOrderStatus(orderId: string, newStatus: OrderStatus) {
+export async function deleteOrder(
+  orderId: string,
+  actor?: { userId?: string; isAdmin?: boolean }
+) {
+  const orderRef = doc(db, ORDERS_COLLECTION, orderId);
+  await runTransaction(db, async (transaction) => {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists()) {
+      throw new Error("Commande introuvable.");
+    }
+    const order = orderSnap.data() as Order;
+    if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
+      throw new Error("Commande non autorisée.");
+    }
+    if (order.stockProcessed) {
+      throw new Error("Commande non supprimable (stock traité).");
+    }
+    if (!["En attente", "Annulée"].includes(order.statut)) {
+      throw new Error("Commande non supprimable.");
+    }
+    transaction.delete(orderRef);
+  });
+}
+
+export async function adminUpdateOrderStatus(
+  orderId: string,
+  newStatus: OrderStatus,
+  actor?: { userId?: string; isAdmin?: boolean }
+) {
   const orderRef = doc(db, ORDERS_COLLECTION, orderId);
 
   await runTransaction(db, async (transaction) => {
@@ -150,12 +227,16 @@ export async function adminUpdateOrderStatus(orderId: string, newStatus: OrderSt
       throw new Error("Commande introuvable.");
     }
     const order = orderSnap.data() as Order;
+    if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
+      throw new Error("Commande non autorisée.");
+    }
     const shouldProcessStock =
       order.statut === "En attente" &&
       ["En préparation", "Expédiée", "Terminée"].includes(newStatus) &&
       !order.stockProcessed;
 
     if (shouldProcessStock) {
+      const stockUpdates: Array<{ productRef: ReturnType<typeof doc>; stock: number; item: OrderDetail }> = [];
       for (const item of order.details) {
         const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
         const productSnap = await transaction.get(productRef);
@@ -167,6 +248,10 @@ export async function adminUpdateOrderStatus(orderId: string, newStatus: OrderSt
         if (item.quantite > stock) {
           throw new Error("Stock insuffisant pour valider la commande.");
         }
+        stockUpdates.push({ productRef, stock, item });
+      }
+
+      for (const { productRef, stock, item } of stockUpdates) {
         transaction.update(productRef, {
           quantite_dispo: stock - item.quantite,
           updatedAt: serverTimestamp(),

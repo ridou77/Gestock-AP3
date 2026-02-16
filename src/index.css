@@ -150,6 +150,11 @@ p {
   font-weight: 600;
 }
 
+.info-value-alert {
+  color: #b00020;
+  font-weight: 800;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -264,6 +269,34 @@ p {
 
 .table tbody tr:hover {
   background: rgba(31, 122, 120, 0.05);
+}
+
+.row-alert {
+  background: rgba(176, 0, 32, 0.14);
+}
+
+.row-alert:hover {
+  background: rgba(176, 0, 32, 0.2);
+}
+
+.stock-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.stock-pill-danger {
+  background: rgba(176, 0, 32, 0.22);
+  color: #7a0016;
+}
+
+.stock-pill-neutral {
+  background: rgba(12, 20, 22, 0.08);
+  color: var(--text-strong);
 }
 
 .table-empty {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { adminUpdateOrderStatus, listenAllOrders } from "../../services/orderService";
+import { adminUpdateOrderStatus, deleteOrder, listenAllOrders } from "../../services/orderService";
 import type { Order, OrderStatus } from "../../types/orders";
 
 const STATUS_OPTIONS: OrderStatus[] = [
@@ -31,9 +31,21 @@ export default function AdminOrders() {
     setSaving((prev) => ({ ...prev, [orderId]: true }));
     setError(null);
     try {
-      await adminUpdateOrderStatus(orderId, status);
+      await adminUpdateOrderStatus(orderId, status, { isAdmin: true });
     } catch (err: any) {
       setError(err.message || "Erreur lors de la mise à jour.");
+    } finally {
+      setSaving((prev) => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleDelete = async (orderId: string) => {
+    setSaving((prev) => ({ ...prev, [orderId]: true }));
+    setError(null);
+    try {
+      await deleteOrder(orderId, { isAdmin: true });
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de la suppression.");
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -57,44 +69,61 @@ export default function AdminOrders() {
               <th>Date</th>
               <th>Statut</th>
               <th>Détails</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {orders.length === 0 ? (
               <tr>
-                <td colSpan={5} className="table-empty">
+                <td colSpan={6} className="table-empty">
                   Aucune commande
                 </td>
               </tr>
             ) : (
-              orders.map((order) => (
-                <tr key={order.id}>
-                  <td>{order.id.slice(0, 6)}...</td>
-                  <td>{order.utilisateurEmail}</td>
-                  <td>{formatDate(order.dateCommande)}</td>
-                  <td>
-                    <select
-                      className="input-select"
-                      value={order.statut}
-                      onChange={(e) => updateStatus(order.id, e.target.value as OrderStatus)}
-                      disabled={saving[order.id]}
-                    >
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
+              orders.map((order) => {
+                const canDelete =
+                  !order.stockProcessed &&
+                  (order.statut === "En attente" || order.statut === "Annulée");
+                return (
+                  <tr key={order.id}>
+                    <td>{order.id.slice(0, 6)}...</td>
+                    <td>{order.utilisateurEmail}</td>
+                    <td>{formatDate(order.dateCommande)}</td>
+                    <td>
+                      <select
+                        className="input-select"
+                        value={order.statut}
+                        onChange={(e) => updateStatus(order.id, e.target.value as OrderStatus)}
+                        disabled={saving[order.id]}
+                      >
+                        {STATUS_OPTIONS.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      {order.details.map((detail, index) => (
+                        <div key={`${detail.productId}-${index}`}>
+                          {detail.nom} — {detail.quantite}
+                        </div>
                       ))}
-                    </select>
-                  </td>
-                  <td>
-                    {order.details.map((detail, index) => (
-                      <div key={`${detail.productId}-${index}`}>
-                        {detail.nom} — {detail.quantite}
-                      </div>
-                    ))}
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="table-actions">
+                      {canDelete && (
+                        <button
+                          className="button button-danger button-small"
+                          onClick={() => handleDelete(order.id)}
+                          disabled={saving[order.id]}
+                        >
+                          {saving[order.id] ? "..." : "Supprimer"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

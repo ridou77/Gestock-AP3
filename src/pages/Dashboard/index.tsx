@@ -108,7 +108,9 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="info-label">Alertes sous seuil</p>
-                <p className="info-value">{lowStock.length}</p>
+                <p className={`info-value ${lowStock.length > 0 ? "info-value-alert" : ""}`}>
+                  {lowStock.length}
+                </p>
               </div>
               <div>
                 <p className="info-label">Commandes en attente</p>
@@ -133,10 +135,18 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {lowStock.slice(0, 5).map((product) => (
-                      <tr key={product.id}>
+                      <tr key={product.id} className="row-alert">
                         <td>{product.nom}</td>
-                        <td>{product.quantite_dispo}</td>
-                        <td>{product.seuil_alerte}</td>
+                        <td>
+                          <span className="stock-pill stock-pill-danger">
+                            {product.quantite_dispo}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="stock-pill stock-pill-neutral">
+                            {product.seuil_alerte}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -4,6 +4,7 @@ import { useRole } from "../../hooks/useRole";
 import {
   adminUpdateOrderStatus,
   cancelOrder,
+  deleteOrder,
   listenAllOrders,
   listenUserOrders,
   updateOrderDetails,
@@ -28,7 +29,7 @@ export default function OrderTrack() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const isStaff = isAdmin || isGestionnaire;
+  const isStaff = isAdmin;
   const canEdit = !!permissions?.canUpdate;
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export default function OrderTrack() {
     setSaving((prev) => ({ ...prev, [orderId]: true }));
     setError(null);
     try {
-      await updateOrderDetails(orderId, draft);
+      await updateOrderDetails(orderId, draft, { userId: user?.uid, isAdmin });
       setDrafts((prev) => {
         const { [orderId]: _, ...rest } = prev;
         return rest;
@@ -87,9 +88,21 @@ export default function OrderTrack() {
   const handleCancel = async (orderId: string) => {
     setSaving((prev) => ({ ...prev, [orderId]: true }));
     try {
-      await cancelOrder(orderId);
+      await cancelOrder(orderId, { userId: user?.uid, isAdmin });
     } catch (err: any) {
       setError(err.message || "Erreur lors de l'annulation.");
+    } finally {
+      setSaving((prev) => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleDelete = async (orderId: string) => {
+    setSaving((prev) => ({ ...prev, [orderId]: true }));
+    setError(null);
+    try {
+      await deleteOrder(orderId, { userId: user?.uid, isAdmin });
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de la suppression.");
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -99,7 +112,7 @@ export default function OrderTrack() {
     setSaving((prev) => ({ ...prev, [orderId]: true }));
     setError(null);
     try {
-      await adminUpdateOrderStatus(orderId, status);
+      await adminUpdateOrderStatus(orderId, status, { userId: user?.uid, isAdmin });
     } catch (err: any) {
       setError(err.message || "Erreur lors de la mise à jour.");
     } finally {
@@ -143,12 +156,18 @@ export default function OrderTrack() {
                   const isEditable =
                     canEdit && order.statut === "En attente" && order.utilisateur === user?.uid;
                   const isOwner = order.utilisateur === user?.uid;
+                  const canManageStatus =
+                    canEdit && (isAdmin || (isGestionnaire && isOwner));
+                  const canDelete =
+                    (isAdmin || isOwner) &&
+                    !order.stockProcessed &&
+                    (order.statut === "En attente" || order.statut === "Annulée");
                   return (
                     <tr key={order.id}>
                       <td>{order.id.slice(0, 6)}...</td>
                       {isStaff && <td>{order.utilisateurEmail}</td>}
                       <td>
-                        {isStaff ? (
+                        {canManageStatus ? (
                           <select
                             className="input-select"
                             value={order.statut}
@@ -217,6 +236,15 @@ export default function OrderTrack() {
                             disabled={saving[order.id]}
                           >
                             {saving[order.id] ? "..." : "Annuler"}
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            className="button button-danger button-small"
+                            onClick={() => handleDelete(order.id)}
+                            disabled={saving[order.id]}
+                          >
+                            {saving[order.id] ? "..." : "Supprimer"}
                           </button>
                         )}
                       </td>
