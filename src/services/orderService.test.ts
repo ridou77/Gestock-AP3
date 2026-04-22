@@ -90,6 +90,12 @@ vi.mock("firebase/firestore", () => {
   };
 
   const serverTimestamp = () => ({ __type: "serverTimestamp" });
+  const addDoc = async (ref: DocRef, data: StoredDoc) => {
+    const newRef = doc(ref);
+    sets.push({ ref: newRef, data });
+    store.set(newRef.path, data);
+    return newRef;
+  };
 
   const onSnapshot = vi.fn();
   const orderBy = vi.fn();
@@ -101,6 +107,7 @@ vi.mock("firebase/firestore", () => {
     doc,
     runTransaction,
     serverTimestamp,
+    addDoc,
     onSnapshot,
     orderBy,
     query,

@@ -7,6 +7,7 @@ import {
     updateDoc,
     onSnapshot,
 } from "firebase/firestore";
+import { logAudit } from "./auditService";
 import type { UserRole, UserData } from "../types/roles";
 
 const USERS_COLLECTION = "users";
@@ -53,6 +54,14 @@ export async function updateUser(uid: string, data: Partial<UserData>): Promise<
     });
 
     await updateDoc(userRef, payload);
+    void logAudit({
+        action: "modification",
+        entity: "user",
+        entityId: uid,
+        metadata: {
+            updatedFields: Object.keys(data),
+        },
+    }).catch((err) => console.warn("Audit update user échoué:", err));
 }
 
 
@@ -106,4 +115,17 @@ export async function initializeNewUser(
         createdAt: new Date(),
         updatedAt: new Date(),
     });
+    void logAudit({
+        action: "creation",
+        entity: "user",
+        entityId: uid,
+        userId: uid,
+        userEmail: email,
+        userRole: role,
+        metadata: {
+            firstName: profile?.firstName ?? "",
+            lastName: profile?.lastName ?? "",
+            age: profile?.age ?? null,
+        },
+    }).catch((err) => console.warn("Audit creation user échoué:", err));
 }

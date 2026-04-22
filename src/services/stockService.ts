@@ -8,6 +8,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { logAudit } from "./auditService";
 import type { StockMovement } from "../types/stock";
 
 const PRODUCTS_COLLECTION = "produits";
@@ -69,4 +70,16 @@ export async function addStockEntry(
       date: serverTimestamp(),
     });
   });
+
+  void logAudit({
+    action: "creation",
+    entity: "movement",
+    entityId: produitId,
+    userId: utilisateur,
+    metadata: {
+      type: "Entrée",
+      produitNom,
+      quantite,
+    },
+  }).catch((err) => console.warn("Audit ajout stock échoué:", err));
 }

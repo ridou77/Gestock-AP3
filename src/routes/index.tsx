@@ -16,6 +16,7 @@ import AdminProducts from "../pages/Admin/Products";
 import AdminStockEntry from "../pages/Admin/StockEntry";
 import AdminMovements from "../pages/Admin/Movements";
 import AdminOrders from "../pages/Admin/Orders";
+import AdminAudit from "../pages/Admin/Audit";
 import ProtectedRoute from "../components/common/ProtectedRoute";
 import AdminRoute from "../components/common/AdminRoute";
 
@@ -140,6 +141,16 @@ export default function AppRoutes() {
           <ProtectedRoute>
             <AdminRoute>
               <AdminOrders />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/audit"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AdminAudit />
             </AdminRoute>
           </ProtectedRoute>
         }

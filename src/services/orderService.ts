@@ -9,6 +9,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { logAudit } from "./auditService";
 import type { Order, OrderDetail, OrderStatus } from "../types/orders";
 
 const ORDERS_COLLECTION = "commandes";
@@ -60,6 +61,7 @@ export async function createOrder(
   details: OrderDetail[]
 ) {
   const ordersRef = collection(db, ORDERS_COLLECTION);
+  const orderRef = doc(ordersRef);
   if (details.length === 0) {
     throw new Error("La commande est vide.");
   }
@@ -78,7 +80,6 @@ export async function createOrder(
       }
     }
 
-    const orderRef = doc(ordersRef);
     transaction.set(orderRef, {
       utilisateur,
       utilisateurEmail,
@@ -88,6 +89,17 @@ export async function createOrder(
       stockProcessed: false,
     });
   });
+
+  void logAudit({
+    action: "creation",
+    entity: "order",
+    entityId: orderRef.id,
+    userId: utilisateur,
+    userEmail: utilisateurEmail,
+    metadata: {
+      items: details.length,
+    },
+  }).catch((err) => console.warn("Audit création commande échouée:", err));
 }
 
 export async function updateOrderDetails(
@@ -128,6 +140,16 @@ export async function updateOrderDetails(
       updatedAt: serverTimestamp(),
     });
   });
+
+  void logAudit({
+    action: "modification",
+    entity: "order",
+    entityId: orderId,
+    userId: actor?.userId,
+    metadata: {
+      items: details.length,
+    },
+  }).catch((err) => console.warn("Audit modification commande échouée:", err));
 }
 
 export async function cancelOrder(
@@ -135,12 +157,16 @@ export async function cancelOrder(
   actor?: { userId?: string; isAdmin?: boolean }
 ) {
   const orderRef = doc(db, ORDERS_COLLECTION, orderId);
+  let previousStatus: OrderStatus | undefined;
+  let hadStockProcessed = false;
   await runTransaction(db, async (transaction) => {
     const orderSnap = await transaction.get(orderRef);
     if (!orderSnap.exists()) {
       throw new Error("Commande introuvable.");
     }
     const order = orderSnap.data() as Order;
+    previousStatus = order.statut;
+    hadStockProcessed = !!order.stockProcessed;
     if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
       throw new Error("Commande non autorisée.");
     }
@@ -188,6 +214,18 @@ export async function cancelOrder(
       stockProcessed: order.stockProcessed ? false : order.stockProcessed,
     });
   });
+
+  void logAudit({
+    action: "modification",
+    entity: "order",
+    entityId: orderId,
+    userId: actor?.userId,
+    metadata: {
+      previousStatus,
+      newStatus: "Annulée",
+      hadStockProcessed,
+    },
+  }).catch((err) => console.warn("Audit annulation commande échouée:", err));
 }
 
 export async function deleteOrder(
@@ -212,6 +250,13 @@ export async function deleteOrder(
     }
     transaction.delete(orderRef);
   });
+
+  void logAudit({
+    action: "suppression",
+    entity: "order",
+    entityId: orderId,
+    userId: actor?.userId,
+  }).catch((err) => console.warn("Audit suppression commande échouée:", err));
 }
 
 export async function adminUpdateOrderStatus(
@@ -220,6 +265,8 @@ export async function adminUpdateOrderStatus(
   actor?: { userId?: string; isAdmin?: boolean }
 ) {
   const orderRef = doc(db, ORDERS_COLLECTION, orderId);
+  let previousStatus: OrderStatus | undefined;
+  let stockProcessed = false;
 
   await runTransaction(db, async (transaction) => {
     const orderSnap = await transaction.get(orderRef);
@@ -227,6 +274,7 @@ export async function adminUpdateOrderStatus(
       throw new Error("Commande introuvable.");
     }
     const order = orderSnap.data() as Order;
+    previousStatus = order.statut;
     if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
       throw new Error("Commande non autorisée.");
     }
@@ -234,6 +282,7 @@ export async function adminUpdateOrderStatus(
       order.statut === "En attente" &&
       ["En préparation", "Expédiée", "Terminée"].includes(newStatus) &&
       !order.stockProcessed;
+    stockProcessed = shouldProcessStock;
 
     if (shouldProcessStock) {
       const stockUpdates: Array<{ productRef: ReturnType<typeof doc>; stock: number; item: OrderDetail }> = [];
@@ -276,4 +325,16 @@ export async function adminUpdateOrderStatus(
       stockProcessed: order.stockProcessed || shouldProcessStock,
     });
   });
+
+  void logAudit({
+    action: "modification",
+    entity: "order",
+    entityId: orderId,
+    userId: actor?.userId,
+    metadata: {
+      previousStatus,
+      newStatus,
+      stockProcessed,
+    },
+  }).catch((err) => console.warn("Audit statut commande échouée:", err));
 }

@@ -69,6 +69,9 @@ export default function Navbar() {
               <Link className="navbar-link" to="/admin/users">
                 Utilisateurs
               </Link>
+              <Link className="navbar-link" to="/admin/audit">
+                Audit
+              </Link>
             </>
           )}
         </div>

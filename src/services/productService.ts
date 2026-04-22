@@ -10,6 +10,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { logAudit } from "./auditService";
 import type { Product, StockType } from "../types/products";
 
 const TYPES_COLLECTION = "typeStock";
@@ -41,21 +42,39 @@ export function listenStockTypes(
 
 export async function createStockType(nom: string, userId: string) {
   const typesRef = collection(db, TYPES_COLLECTION);
-  await addDoc(typesRef, {
+  const docRef = await addDoc(typesRef, {
     nom,
     createdBy: userId,
     createdAt: serverTimestamp(),
   });
+  void logAudit({
+    action: "creation",
+    entity: "stock",
+    entityId: docRef.id,
+    userId,
+    metadata: { nom },
+  }).catch((err) => console.warn("Audit creation type échoué:", err));
 }
 
 export async function updateStockType(id: string, nom: string) {
   const typeRef = doc(db, TYPES_COLLECTION, id);
   await updateDoc(typeRef, { nom });
+  void logAudit({
+    action: "modification",
+    entity: "stock",
+    entityId: id,
+    metadata: { nom },
+  }).catch((err) => console.warn("Audit update type échoué:", err));
 }
 
 export async function deleteStockType(id: string) {
   const typeRef = doc(db, TYPES_COLLECTION, id);
   await deleteDoc(typeRef);
+  void logAudit({
+    action: "suppression",
+    entity: "stock",
+    entityId: id,
+  }).catch((err) => console.warn("Audit delete type échoué:", err));
 }
 
 export function listenProducts(
@@ -89,11 +108,23 @@ export function listenProducts(
 
 export async function createProduct(data: Omit<Product, "id" | "createdAt" | "updatedAt">) {
   const productsRef = collection(db, PRODUCTS_COLLECTION);
-  await addDoc(productsRef, {
+  const docRef = await addDoc(productsRef, {
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  void logAudit({
+    action: "creation",
+    entity: "product",
+    entityId: docRef.id,
+    userId: data.createdBy,
+    metadata: {
+      nom: data.nom,
+      typeStockId: data.typeStockId,
+      quantite_dispo: data.quantite_dispo,
+      seuil_alerte: data.seuil_alerte,
+    },
+  }).catch((err) => console.warn("Audit creation produit échoué:", err));
 }
 
 export async function updateProduct(id: string, data: Partial<Product>) {
@@ -103,9 +134,22 @@ export async function updateProduct(id: string, data: Partial<Product>) {
     updatedAt: serverTimestamp(),
   };
   await updateDoc(productRef, payload);
+  void logAudit({
+    action: "modification",
+    entity: "product",
+    entityId: id,
+    metadata: {
+      updatedFields: Object.keys(data),
+    },
+  }).catch((err) => console.warn("Audit update produit échoué:", err));
 }
 
 export async function deleteProduct(id: string) {
   const productRef = doc(db, PRODUCTS_COLLECTION, id);
   await deleteDoc(productRef);
+  void logAudit({
+    action: "suppression",
+    entity: "product",
+    entityId: id,
+  }).catch((err) => console.warn("Audit delete produit échoué:", err));
 }
