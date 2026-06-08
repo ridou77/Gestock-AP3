@@ -4,6 +4,13 @@
 
 **Application accessible en production à cette URL sans aucune autre manipulation nécéssaire:** [https://gestock-ap3.web.app](https://gestock-ap3.web.app)
 
+Pour accéder à l'application en production, utiliser le compte admin suivant :
+
+| Champ | Valeur |
+|-------|--------|
+| **Email** | `test.admin@gmail.com` |
+| **Mot de passe** | `Test1234!` |
+
 ---
 
 ## Architecture de déploiement
