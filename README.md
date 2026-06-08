@@ -8,7 +8,7 @@ Pour accéder à l'application en production, utiliser le compte admin suivant :
 
 | Champ | Valeur |
 |-------|--------|
-| **Email** | `test.admin@gmail.com` |
+| **Email** | `test.jury@gmail.com` |
 | **Mot de passe** | `Test1234!` |
 
 ---
