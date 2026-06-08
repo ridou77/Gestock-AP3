@@ -1,7 +1,8 @@
 # Déploiement — Gestock (Application React)
 
 > **Dépôt GitHub :** [Gestock-AP3](https://github.com/ridou77/Gestock-AP3)  
-> **Application accessible en production à cette URL :** [https://gestock-ap3.web.app](https://gestock-ap3.web.app)
+
+**Application accessible en production à cette URL sans aucune autre manipulation nécéssaire:** [https://gestock-ap3.web.app](https://gestock-ap3.web.app)
 
 ---
 
