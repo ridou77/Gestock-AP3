@@ -1,11 +1,11 @@
-# 🚀 Déploiement — Gestock (Application React)
+# Déploiement — Gestock (Application React)
 
 > **Dépôt GitHub :** [Gestock-AP3](https://github.com/ridou77/Gestock-AP3)  
 > **Application accessible en production à cette URL :** [https://gestock-ap3.web.app](https://gestock-ap3.web.app)
 
 ---
 
-## 📐 Architecture de déploiement
+## Architecture de déploiement
 
 ```
 ┌──────────────────────┐    npm run build     ┌──────────────────┐   firebase deploy   ┌─────────────────────────┐
@@ -18,7 +18,7 @@ L'application est une **Single Page Application (SPA)** React déployée sur **F
 
 ---
 
-## 🛠️ Ma procédure de déploiement
+## Ma procédure de déploiement
 
 ### Prérequis
 
@@ -67,11 +67,11 @@ firebase deploy --only hosting
 ```
 
 Une fois déployée, l'application est accessible à l'adresse :  
-👉 **[https://gestock-ap3.web.app](https://gestock-ap3.web.app)**
+**[https://gestock-ap3.web.app](https://gestock-ap3.web.app)**
 
 ---
 
-## 🔐 Variables d'environnement
+## Variables d'environnement
 
 La configuration Firebase (clés API, identifiants du projet, etc.) est stockée dans un fichier **`.env.local`** à la racine du projet. Ce fichier est **intentionnellement exclu du dépôt** (listé dans `.gitignore`) pour ne pas exposer les clés publiquement.
 
@@ -95,14 +95,14 @@ cp .env.example .env.local
 
 ---
 
-## 🌐 Accès à l'application
+## Accès à l'application
 
 | Environnement | URL |
 |--------------|-----|
 | **Production** | [https://gestock-ap3.web.app](https://gestock-ap3.web.app) |
 | **Local (dev)** | `http://localhost:3000` (via `npm start`) |
 
-### 🔑 Identifiants de test (épreuve)
+### Identifiants de test (épreuve)
 
 Pour accéder à l'application en production, utiliser le compte suivant :
 
@@ -113,7 +113,7 @@ Pour accéder à l'application en production, utiliser le compte suivant :
 
 ---
 
-## 📁 Structure des fichiers liés au déploiement
+## Structure des fichiers liés au déploiement
 
 ```
 Gestock-AP3/
@@ -127,7 +127,7 @@ Gestock-AP3/
 
 ---
 
-## ⚠️ Remarques de sécurité — Contexte d'épreuve
+## Remarques de sécurité — Contexte d'épreuve
 
 > **Ce déploiement est réalisé dans un cadre pédagogique (Épreuve BTS SIO E6 — Conception et développement d'applications) et illustre une procédure de déploiement standard.**
 > 
