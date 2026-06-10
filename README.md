@@ -101,7 +101,7 @@ cp .env.example .env.local
 # Puis renseigner les valeurs dans .env.local
 ```
 
-## Retranscription dse schéma de base de données
+## Retranscription des schémas de base de données
 <img width="1048" height="722" alt="image" src="https://github.com/user-attachments/assets/1600de96-9add-4931-a7cd-15fa01db4ffa" />
 <img width="978" height="742" alt="image" src="https://github.com/user-attachments/assets/82a0e7e8-752f-4c65-ad32-b475d93dca02" />
 
