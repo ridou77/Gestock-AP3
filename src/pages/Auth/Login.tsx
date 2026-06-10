@@ -18,8 +18,19 @@ export default function Login({ defaultMode = "login" }: Props) {
   const [age, setAge] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const getErrorMessage = (err: unknown, fallback: string) =>
-    err instanceof Error ? err.message : fallback;
+  const getErrorMessage = (err: unknown, fallback: string) => {
+    const code = typeof err === "object" && err !== null && "code" in err
+      ? String((err as { code?: unknown }).code)
+      : "";
+    if (
+      code === "auth/invalid-credential" ||
+      code === "auth/user-not-found" ||
+      code === "auth/wrong-password"
+    ) {
+      return "Identifiant ou mot de passe invalide";
+    }
+    return err instanceof Error ? err.message : fallback;
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
