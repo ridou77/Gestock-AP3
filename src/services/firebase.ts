@@ -8,16 +8,15 @@ import { enableIndexedDbPersistence, getFirestore } from "firebase/firestore";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Your web app's Firebase configuration (utilise les variables d'environnement Vite)
 const firebaseConfig = {
-  apiKey: "AIzaSyB8cOC-Zn0XdVUy9-ZIepK7po7fhHivlN0",
-  authDomain: "gestock-ap3.firebaseapp.com",
-  projectId: "gestock-ap3",
-  storageBucket: "gestock-ap3.firebasestorage.app",
-  messagingSenderId: "206447186538",
-  appId: "1:206447186538:web:928a963b779c254a727013",
-  measurementId: "G-7FZGCM5ZQR"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
