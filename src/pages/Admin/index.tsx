@@ -90,9 +90,9 @@ export default function AdminDashboard() {
           <Link className="button button-primary" to="/admin/users">
             Utilisateurs
           </Link>
-          {/* <Link className="button button-primary" to="/admin/audit">
+          <Link className="button button-primary" to="/admin/audit">
             Audit
-          </Link> */}
+          </Link>
         </div>
       </div>
 
