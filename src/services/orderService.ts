@@ -386,9 +386,10 @@ export async function adminUpdateOrderStatus(
       order.statut === "En attente" &&
       ["En préparation", "Expédiée", "Terminée"].includes(newStatus) &&
       !order.stockProcessed;
+    const shouldRestoreStock = newStatus === "Annulée" && !!order.stockProcessed;
     stockProcessed = shouldProcessStock;
 
-    if (shouldProcessStock) {
+    if (shouldProcessStock || shouldRestoreStock) {
       const stockUpdates: Array<{ productRef: ReturnType<typeof doc>; stock: number; item: OrderDetail }> = [];
       for (const item of order.details) {
         const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
@@ -406,13 +407,13 @@ export async function adminUpdateOrderStatus(
 
       for (const { productRef, stock, item } of stockUpdates) {
         transaction.update(productRef, {
-          quantite_dispo: stock - item.quantite,
+          quantite_dispo: shouldRestoreStock ? stock + item.quantite : stock - item.quantite,
           updatedAt: serverTimestamp(),
         });
 
         const movementRef = doc(collection(db, MOVEMENTS_COLLECTION));
         transaction.set(movementRef, {
-          type_mouvement: "Sortie",
+          type_mouvement: shouldRestoreStock ? "Entrée" : "Sortie",
           produitId: item.productId,
           produitNom: item.nom,
           quantite: item.quantite,
@@ -426,7 +427,7 @@ export async function adminUpdateOrderStatus(
     transaction.update(orderRef, {
       statut: newStatus,
       updatedAt: serverTimestamp(),
-      stockProcessed: order.stockProcessed || shouldProcessStock,
+      stockProcessed: shouldRestoreStock ? false : order.stockProcessed || shouldProcessStock,
     });
   });
 
@@ -439,6 +440,7 @@ export async function adminUpdateOrderStatus(
       previousStatus,
       newStatus,
       stockProcessed,
+      restoredStock: newStatus === "Annulée",
     },
   }).catch((err) => console.warn("Audit statut commande échouée:", err));
 }

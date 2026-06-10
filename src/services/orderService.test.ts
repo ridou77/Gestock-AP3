@@ -191,6 +191,29 @@ describe("orderService", () => {
     expect(sets.some((s) => s.ref.path.startsWith("mouvements/"))).toBe(true);
   });
 
+  it("recrédite le stock quand le statut passe à Annulée depuis la liste", async () => {
+    fsMock.__setDoc("commandes/o1", {
+      statut: "En préparation",
+      utilisateur: "u1",
+      stockProcessed: true,
+      details: [{ productId: "p1", nom: "Clavier", quantite: 2 }],
+    });
+    fsMock.__setDoc("produits/p1", { quantite_dispo: 5 });
+
+    await adminUpdateOrderStatus("o1", "Annulée", { userId: "u1", isAdmin: false });
+
+    const updates = fsMock.__getUpdates();
+    const productUpdate = updates.find((u) => u.ref.path === "produits/p1");
+    const orderUpdate = updates.find((u) => u.ref.path === "commandes/o1");
+    expect(productUpdate?.data.quantite_dispo).toBe(7);
+    expect(orderUpdate?.data.statut).toBe("Annulée");
+    expect(orderUpdate?.data.stockProcessed).toBe(false);
+
+    const sets = fsMock.__getSets();
+    const movement = sets.find((s) => s.ref.path.startsWith("mouvements/"));
+    expect(movement?.data.type_mouvement).toBe("Entrée");
+  });
+
   it("recrédite le stock avant suppression si le stock a été traité", async () => {
     fsMock.__setDoc("commandes/o1", {
       statut: "Terminée",
