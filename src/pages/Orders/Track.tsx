@@ -3,7 +3,6 @@ import { useAuth } from "../../hooks/useAuth";
 import { useRole } from "../../hooks/useRole";
 import {
   adminUpdateOrderStatus,
-  cancelOrder,
   deleteOrder,
   listenAllOrders,
   listenUserOrders,
@@ -88,18 +87,12 @@ export default function OrderTrack() {
     }
   };
 
-  const handleCancel = async (orderId: string) => {
-    setSaving((prev) => ({ ...prev, [orderId]: true }));
-    try {
-      await cancelOrder(orderId, { userId: user?.uid, isAdmin });
-    } catch (err) {
-      setError(getErrorMessage(err, "Erreur lors de l'annulation."));
-    } finally {
-      setSaving((prev) => ({ ...prev, [orderId]: false }));
-    }
-  };
-
   const handleDelete = async (orderId: string) => {
+    const confirmed = window.confirm(
+      "Supprimer cette commande ? Cette action est définitive."
+    );
+    if (!confirmed) return;
+
     setSaving((prev) => ({ ...prev, [orderId]: true }));
     setError(null);
     try {
@@ -156,15 +149,11 @@ export default function OrderTrack() {
               ) : (
                 orders.map((order) => {
                   const draft = drafts[order.id];
-                  const isEditable =
-                    canEdit && order.statut === "En attente" && order.utilisateur === user?.uid;
                   const isOwner = order.utilisateur === user?.uid;
+                  const isEditable = canEdit && (isAdmin || isOwner);
                   const canManageStatus =
                     canEdit && (isAdmin || (isGestionnaire && isOwner));
-                  const canDelete =
-                    (isAdmin || isOwner) &&
-                    !order.stockProcessed &&
-                    (order.statut === "En attente" || order.statut === "Annulée");
+                  const canDelete = isAdmin || isOwner;
                   return (
                     <tr key={order.id}>
                       <td>{order.id.slice(0, 6)}...</td>
@@ -187,69 +176,68 @@ export default function OrderTrack() {
                           order.statut
                         )}
                       </td>
-                      <td>
+                      <td className="order-details-cell">
                         {draft ? (
-                          <div style={{ display: "grid", gap: "6px" }}>
+                          <div className="order-details-edit">
                             {draft.map((detail, index) => (
-                              <div key={`${detail.productId}-${index}`}>
-                                {detail.nom}
+                              <label
+                                className="order-detail-edit"
+                                key={`${detail.productId}-${index}`}
+                              >
+                                <span className="order-detail-name">{detail.nom}</span>
                                 <input
-                                  className="input input-compact"
+                                  className="input input-compact order-detail-quantity"
                                   type="number"
                                   min={0}
                                   value={detail.quantite}
                                   onChange={(e) => updateDraft(order.id, index, e.target.value)}
                                 />
-                              </div>
+                              </label>
                             ))}
                           </div>
                         ) : (
-                          order.details.map((detail, index) => (
-                            <div key={`${detail.productId}-${index}`}>
-                              {detail.nom} — {detail.quantite}
-                            </div>
-                          ))
+                          <div className="order-details-readonly">
+                            {order.details.map((detail, index) => (
+                              <div
+                                className="order-detail-readonly"
+                                key={`${detail.productId}-${index}`}
+                              >
+                                <span>{detail.nom}</span>
+                                <span className="order-detail-count">{detail.quantite}</span>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </td>
-                      <td className="table-actions">
-                        {isEditable && !draft && (
-                          <button
-                            className="button button-primary button-small"
-                            onClick={() => startEdit(order)}
-                          >
-                            Modifier
-                          </button>
-                        )}
-                        {draft && (
-                          <button
-                            className="button button-primary button-small"
-                            onClick={() => saveDraft(order.id)}
-                            disabled={saving[order.id]}
-                          >
-                            {saving[order.id] ? "..." : "Enregistrer"}
-                          </button>
-                        )}
-                        {canEdit &&
-                          isOwner &&
-                          order.statut !== "Terminée" &&
-                          order.statut !== "Annulée" && (
-                          <button
-                            className="button button-danger button-small"
-                            onClick={() => handleCancel(order.id)}
-                            disabled={saving[order.id]}
-                          >
-                            {saving[order.id] ? "..." : "Annuler"}
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            className="button button-danger button-small"
-                            onClick={() => handleDelete(order.id)}
-                            disabled={saving[order.id]}
-                          >
-                            {saving[order.id] ? "..." : "Supprimer"}
-                          </button>
-                        )}
+                      <td className="order-actions-cell">
+                        <div className="table-actions order-actions">
+                          {isEditable && !draft && (
+                            <button
+                              className="button button-primary button-small"
+                              onClick={() => startEdit(order)}
+                            >
+                              Modifier
+                            </button>
+                          )}
+                          {draft && (
+                            <button
+                              className="button button-primary button-small"
+                              onClick={() => saveDraft(order.id)}
+                              disabled={saving[order.id]}
+                            >
+                              {saving[order.id] ? "..." : "Enregistrer"}
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              className="button button-danger button-small"
+                              onClick={() => handleDelete(order.id)}
+                              disabled={saving[order.id]}
+                            >
+                              {saving[order.id] ? "..." : "Supprimer"}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

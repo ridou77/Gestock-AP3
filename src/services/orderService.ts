@@ -16,6 +16,16 @@ const ORDERS_COLLECTION = "commandes";
 const PRODUCTS_COLLECTION = "produits";
 const MOVEMENTS_COLLECTION = "mouvements";
 
+function sumQuantitiesByProduct(details: OrderDetail[]) {
+  return details.reduce<Record<string, { nom: string; quantite: number }>>((acc, item) => {
+    acc[item.productId] = {
+      nom: item.nom,
+      quantite: (acc[item.productId]?.quantite ?? 0) + item.quantite,
+    };
+    return acc;
+  }, {});
+}
+
 export function listenUserOrders(
   userId: string,
   onOrders: (orders: Order[]) => void,
@@ -111,6 +121,7 @@ export async function updateOrderDetails(
   if (details.length === 0) {
     throw new Error("La commande est vide.");
   }
+
   await runTransaction(db, async (transaction) => {
     const orderSnap = await transaction.get(orderRef);
     if (!orderSnap.exists()) {
@@ -120,21 +131,81 @@ export async function updateOrderDetails(
     if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
       throw new Error("Commande non autorisée.");
     }
-    if (order.statut !== "En attente") {
-      throw new Error("Commande non modifiable.");
-    }
-    for (const item of details) {
-      const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
-      const productSnap = await transaction.get(productRef);
-      if (!productSnap.exists()) {
-        throw new Error("Produit introuvable.");
+
+    if (order.stockProcessed) {
+      const previousByProduct = sumQuantitiesByProduct(order.details);
+      const nextByProduct = sumQuantitiesByProduct(details);
+      const productIds = new Set([
+        ...Object.keys(previousByProduct),
+        ...Object.keys(nextByProduct),
+      ]);
+      const stockUpdates: Array<{
+        productRef: ReturnType<typeof doc>;
+        productId: string;
+        produitNom: string;
+        quantityDelta: number;
+        nextStock: number;
+      }> = [];
+
+      for (const productId of productIds) {
+        const previousQuantity = previousByProduct[productId]?.quantite ?? 0;
+        const nextQuantity = nextByProduct[productId]?.quantite ?? 0;
+        const quantityDelta = previousQuantity - nextQuantity;
+        if (quantityDelta === 0) continue;
+
+        const productRef = doc(db, PRODUCTS_COLLECTION, productId);
+        const productSnap = await transaction.get(productRef);
+        if (!productSnap.exists()) {
+          throw new Error("Produit introuvable.");
+        }
+        const data = productSnap.data();
+        const stock = Number(data.quantite_dispo ?? 0);
+        const nextStock = stock + quantityDelta;
+        if (nextStock < 0) {
+          throw new Error("Quantité demandée supérieure au stock.");
+        }
+
+        stockUpdates.push({
+          productRef,
+          productId,
+          produitNom: nextByProduct[productId]?.nom ?? previousByProduct[productId]?.nom ?? "",
+          quantityDelta,
+          nextStock,
+        });
       }
-      const data = productSnap.data();
-      const stock = Number(data.quantite_dispo ?? 0);
-      if (item.quantite > stock) {
-        throw new Error("Quantité demandée supérieure au stock.");
+
+      for (const update of stockUpdates) {
+        transaction.update(update.productRef, {
+          quantite_dispo: update.nextStock,
+          updatedAt: serverTimestamp(),
+        });
+
+        const movementRef = doc(collection(db, MOVEMENTS_COLLECTION));
+        transaction.set(movementRef, {
+          type_mouvement: update.quantityDelta > 0 ? "Entrée" : "Sortie",
+          produitId: update.productId,
+          produitNom: update.produitNom,
+          quantite: Math.abs(update.quantityDelta),
+          utilisateur: order.utilisateur,
+          date: serverTimestamp(),
+          orderId,
+        });
+      }
+    } else {
+      for (const item of details) {
+        const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
+        const productSnap = await transaction.get(productRef);
+        if (!productSnap.exists()) {
+          throw new Error("Produit introuvable.");
+        }
+        const data = productSnap.data();
+        const stock = Number(data.quantite_dispo ?? 0);
+        if (item.quantite > stock) {
+          throw new Error("Quantité demandée supérieure au stock.");
+        }
       }
     }
+
     transaction.update(orderRef, {
       details,
       updatedAt: serverTimestamp(),
@@ -233,21 +304,51 @@ export async function deleteOrder(
   actor?: { userId?: string; isAdmin?: boolean }
 ) {
   const orderRef = doc(db, ORDERS_COLLECTION, orderId);
+  let hadStockProcessed = false;
+
   await runTransaction(db, async (transaction) => {
     const orderSnap = await transaction.get(orderRef);
     if (!orderSnap.exists()) {
       throw new Error("Commande introuvable.");
     }
     const order = orderSnap.data() as Order;
+    hadStockProcessed = !!order.stockProcessed;
     if (!actor?.isAdmin && actor?.userId && order.utilisateur !== actor.userId) {
       throw new Error("Commande non autorisée.");
     }
+
     if (order.stockProcessed) {
-      throw new Error("Commande non supprimable (stock traité).");
+      const stockUpdates: Array<{ productRef: ReturnType<typeof doc>; stock: number; item: OrderDetail }> = [];
+      for (const item of order.details) {
+        const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
+        const productSnap = await transaction.get(productRef);
+        if (!productSnap.exists()) {
+          throw new Error("Produit introuvable.");
+        }
+        const data = productSnap.data();
+        const stock = Number(data.quantite_dispo ?? 0);
+        stockUpdates.push({ productRef, stock, item });
+      }
+
+      for (const { productRef, stock, item } of stockUpdates) {
+        transaction.update(productRef, {
+          quantite_dispo: stock + item.quantite,
+          updatedAt: serverTimestamp(),
+        });
+
+        const movementRef = doc(collection(db, MOVEMENTS_COLLECTION));
+        transaction.set(movementRef, {
+          type_mouvement: "Entrée",
+          produitId: item.productId,
+          produitNom: item.nom,
+          quantite: item.quantite,
+          utilisateur: order.utilisateur,
+          date: serverTimestamp(),
+          orderId,
+        });
+      }
     }
-    if (!["En attente", "Annulée"].includes(order.statut)) {
-      throw new Error("Commande non supprimable.");
-    }
+
     transaction.delete(orderRef);
   });
 
@@ -256,6 +357,9 @@ export async function deleteOrder(
     entity: "order",
     entityId: orderId,
     userId: actor?.userId,
+    metadata: {
+      hadStockProcessed,
+    },
   }).catch((err) => console.warn("Audit suppression commande échouée:", err));
 }
 

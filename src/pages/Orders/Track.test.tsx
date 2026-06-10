@@ -1,11 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import OrderTrack from "./Track";
 import { useAuth } from "../../hooks/useAuth";
 import { useRole } from "../../hooks/useRole";
 import {
   adminUpdateOrderStatus,
-  cancelOrder,
+  deleteOrder,
   listenUserOrders,
   updateOrderDetails,
 } from "../../services/orderService";
@@ -27,6 +28,7 @@ vi.mock("../../services/orderService", () => ({
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseRole = vi.mocked(useRole);
 const mockedListenUserOrders = vi.mocked(listenUserOrders);
+const mockedDeleteOrder = vi.mocked(deleteOrder);
 
 describe("OrderTrack", () => {
   beforeEach(() => {
@@ -72,18 +74,34 @@ describe("OrderTrack", () => {
     expect(selects).toHaveLength(2);
   });
 
-  it("n'affiche le bouton Modifier que si la commande est en attente", () => {
+  it("affiche le bouton Modifier quel que soit le statut", () => {
     render(<OrderTrack />);
     const editButtons = screen.getAllByText("Modifier");
-    expect(editButtons).toHaveLength(1);
+    expect(editButtons).toHaveLength(2);
   });
 
-  it("n'affiche le bouton Annuler que si la commande est annulable", () => {
+  it("n'affiche pas de bouton Annuler", () => {
     render(<OrderTrack />);
-    const cancelButtons = screen.getAllByText("Annuler");
-    expect(cancelButtons).toHaveLength(1);
+    expect(screen.queryByText("Annuler")).not.toBeInTheDocument();
     expect(updateOrderDetails).not.toHaveBeenCalled();
-    expect(cancelOrder).not.toHaveBeenCalled();
     expect(adminUpdateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it("demande une confirmation avant de supprimer une commande", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<OrderTrack />);
+    await user.click(screen.getAllByText("Supprimer")[0]);
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "Supprimer cette commande ? Cette action est définitive."
+    );
+    await waitFor(() => {
+      expect(mockedDeleteOrder).toHaveBeenCalledWith("o1", {
+        userId: "u1",
+        isAdmin: false,
+      });
+    });
   });
 });

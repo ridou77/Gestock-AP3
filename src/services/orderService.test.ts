@@ -2,11 +2,12 @@ import { vi } from "vitest";
 import {
   adminUpdateOrderStatus,
   cancelOrder,
+  deleteOrder,
   updateOrderDetails,
 } from "./orderService";
 import * as firestore from "firebase/firestore";
 
-vi.mock("./firebase", () => ({ db: {} }));
+vi.mock("./firebase", () => ({ db: {}, auth: { currentUser: null } }));
 
 vi.mock("firebase/firestore", () => {
   type DocRef = { path: string; id: string; __type?: "collection" };
@@ -125,6 +126,7 @@ type FirestoreTestHelpers = {
   __setDoc: (path: string, data: Record<string, unknown>) => void;
   __getUpdates: () => Array<{ ref: { path: string }; data: Record<string, unknown> }>;
   __getSets: () => Array<{ ref: { path: string }; data: Record<string, unknown> }>;
+  __getDeletes: () => Array<{ path: string }>;
 };
 
 const fsMock = firestore as unknown as FirestoreTestHelpers;
@@ -134,20 +136,26 @@ describe("orderService", () => {
     fsMock.__reset();
   });
 
-  it("refuse la modification si la commande n'est pas en attente", async () => {
+  it("autorise la modification même si la commande n'est pas en attente", async () => {
     fsMock.__setDoc("commandes/o1", {
       statut: "Terminée",
       utilisateur: "u1",
+      stockProcessed: false,
       details: [{ productId: "p1", nom: "Clavier", quantite: 1 }],
     });
+    fsMock.__setDoc("produits/p1", { quantite_dispo: 5 });
 
-    await expect(
-      updateOrderDetails(
-        "o1",
-        [{ productId: "p1", nom: "Clavier", quantite: 1 }],
-        { userId: "u1" }
-      )
-    ).rejects.toThrow("Commande non modifiable.");
+    await updateOrderDetails(
+      "o1",
+      [{ productId: "p1", nom: "Clavier", quantite: 2 }],
+      { userId: "u1" }
+    );
+
+    const updates = fsMock.__getUpdates();
+    const orderUpdate = updates.find((u) => u.ref.path === "commandes/o1");
+    expect(orderUpdate?.data.details).toEqual([
+      { productId: "p1", nom: "Clavier", quantite: 2 },
+    ]);
   });
 
   it("refuse la mise à jour du statut si l'acteur n'est pas propriétaire", async () => {
@@ -181,5 +189,22 @@ describe("orderService", () => {
 
     const sets = fsMock.__getSets();
     expect(sets.some((s) => s.ref.path.startsWith("mouvements/"))).toBe(true);
+  });
+
+  it("recrédite le stock avant suppression si le stock a été traité", async () => {
+    fsMock.__setDoc("commandes/o1", {
+      statut: "Terminée",
+      utilisateur: "u1",
+      stockProcessed: true,
+      details: [{ productId: "p1", nom: "Clavier", quantite: 2 }],
+    });
+    fsMock.__setDoc("produits/p1", { quantite_dispo: 5 });
+
+    await deleteOrder("o1", { userId: "u1", isAdmin: false });
+
+    const updates = fsMock.__getUpdates();
+    const productUpdate = updates.find((u) => u.ref.path === "produits/p1");
+    expect(productUpdate?.data.quantite_dispo).toBe(7);
+    expect(fsMock.__getDeletes().some((ref) => ref.path === "commandes/o1")).toBe(true);
   });
 });

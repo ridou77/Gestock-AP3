@@ -311,6 +311,66 @@ p {
   flex-wrap: wrap;
 }
 
+.order-actions-cell {
+  min-width: 210px;
+  white-space: normal;
+}
+
+.order-actions {
+  align-items: center;
+}
+
+.order-actions .button {
+  min-width: 92px;
+  text-align: center;
+}
+
+.order-details-cell {
+  white-space: normal;
+}
+
+.order-details-readonly,
+.order-details-edit {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.order-detail-readonly,
+.order-detail-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.order-detail-name,
+.order-detail-readonly span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.order-detail-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(31, 122, 120, 0.12);
+  color: var(--accent-cool);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.order-detail-quantity {
+  width: 76px;
+  text-align: center;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -341,5 +401,23 @@ p {
   .table-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .order-actions-cell {
+    min-width: 140px;
+  }
+
+  .order-actions .button {
+    width: 100%;
+  }
+
+  .order-detail-readonly,
+  .order-detail-edit {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .order-detail-quantity {
+    width: 100%;
   }
 }
